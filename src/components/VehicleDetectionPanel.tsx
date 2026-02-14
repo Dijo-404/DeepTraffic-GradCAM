@@ -21,6 +21,7 @@ interface VehicleDetectionPanelProps {
     confidence: number;
     source: "yolo" | "classifier" | "hybrid";
   };
+  activeTrackIds?: number[];
   className?: string;
 }
 
@@ -61,6 +62,7 @@ export const VehicleDetectionPanel = ({
   confidenceThreshold,
   onConfidenceChange,
   hybridResult,
+  activeTrackIds = [],
   className,
 }: VehicleDetectionPanelProps) => {
   return (
@@ -74,7 +76,7 @@ export const VehicleDetectionPanel = ({
           <h3 className="font-semibold flex items-center gap-2">
             YOLO Detection
             <Badge variant="outline" className="text-xs font-mono">
-              YOLOv8
+              YOLOv8 + BoT-SORT
             </Badge>
           </h3>
           <p className="text-sm text-muted-foreground">Real-time vehicle counting</p>
@@ -100,6 +102,14 @@ export const VehicleDetectionPanel = ({
           </span>
           <span className="text-muted-foreground">vehicles</span>
         </div>
+        {activeTrackIds.length > 0 && (
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-xs text-muted-foreground">Active Tracks</span>
+            <span className="text-sm font-mono font-bold text-purple-400">
+              {activeTrackIds.length}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Count by Class */}
@@ -107,7 +117,7 @@ export const VehicleDetectionPanel = ({
         {(Object.entries(countByClass) as [VehicleClass, number][]).map(([cls, count]) => {
           const Icon = vehicleIcons[cls];
           return (
-            <div 
+            <div
               key={cls}
               className={cn(
                 "flex flex-col items-center p-2 rounded-lg border",
@@ -129,8 +139,8 @@ export const VehicleDetectionPanel = ({
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium flex items-center gap-2">
               Hybrid Density
-              <Badge 
-                variant="outline" 
+              <Badge
+                variant="outline"
                 className={cn(
                   "text-xs",
                   hybridResult.source === "hybrid" && "border-primary text-primary",
@@ -201,8 +211,8 @@ export const VehicleDetectionPanel = ({
       {/* Architecture Note */}
       <div className="mt-4 pt-4 border-t border-border/50">
         <p className="text-xs text-muted-foreground">
-          <strong>Hybrid Architecture:</strong> YOLO provides precise vehicle counts while 
-          MobileNetV2 handles density classification. Combined for improved accuracy.
+          <strong>Hybrid Architecture:</strong> YOLO provides precise vehicle counts with
+          BoT-SORT multi-object tracking, while MobileNetV2 handles density classification.
         </p>
       </div>
     </div>

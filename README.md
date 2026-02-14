@@ -29,12 +29,51 @@ git clone <YOUR_GIT_URL>
 # Step 2: Navigate to the project directory.
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Step 3: Set up the Python Backend (YOLOv8 + BoT-SORT)
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+1. Create a virtual environment:
+   ```sh
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+2. Install dependencies:
+   ```sh
+   pip install -r backend/requirements.txt
+   ```
+
+3. Start the backend server:
+   ```sh
+   cd backend
+   python main.py
+   ```
+   The API will start at `http://localhost:8000`.
+
+# Step 4: Start the Frontend
+
+```sh
 npm run dev
 ```
+The frontend will proxy `/api` requests to the backend.
+
+## Hybrid Architecture
+
+This project uses a **hybrid traffic analysis engine**:
+
+1.  **YOLOv8 (Backend)**: Runs on the server to detect vehicles and track them using **BoT-SORT** (Multi-Object Tracking).
+    *   **Model**: `backend/models/best.pt`
+    *   **Tracker**: BoT-SORT (custom config in `backend/botsort.yaml`)
+2.  **MobileNetV2 (Frontend)**: Runs in the browser (TensorFlow.js) to classify overall traffic density.
+3.  **Grad-CAM**: Generates heatmaps for density explanation.
+
+## Data Flow
+
+1.  **Video Input**: User drops a video file.
+2.  **Frame Capture**: Frontend captures frames at ~10 FPS.
+3.  **Inference**: Frames are sent to `POST /api/detect`.
+4.  **Tracking**: Backend runs YOLO inference + BoT-SORT tracking.
+5.  **Visualization**: Frontend renders bounding boxes with persistent Track IDs.
+
 
 **Edit a file directly in GitHub**
 

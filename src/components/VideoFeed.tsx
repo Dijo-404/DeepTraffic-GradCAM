@@ -9,6 +9,7 @@ import type { Detection } from "@/hooks/useYOLODetection";
 interface VideoFeedProps {
   onVideoLoad?: (video: HTMLVideoElement) => void;
   onFrameProcess?: () => void;
+  onVideoRef?: (el: HTMLVideoElement | null) => void;
   showHeatmap: boolean;
   trafficStatus: "low" | "high" | "analyzing";
   /** YOLO detection results to display as bounding boxes */
@@ -45,14 +46,15 @@ const shouldShowGradCAM = (status: "low" | "high" | "analyzing", enabled: boolea
   return enabled && status === "high";
 };
 
-export const VideoFeed = ({ 
-  onVideoLoad, 
+export const VideoFeed = ({
+  onVideoLoad,
   onFrameProcess,
-  showHeatmap, 
+  onVideoRef,
+  showHeatmap,
   trafficStatus,
   detections = [],
   showBoundingBoxes = false,
-  className 
+  className
 }: VideoFeedProps) => {
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -61,6 +63,12 @@ export const VideoFeed = ({
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Expose video element to parent via callback ref
+  const setVideoRef = useCallback((el: HTMLVideoElement | null) => {
+    (videoRef as React.MutableRefObject<HTMLVideoElement | null>).current = el;
+    onVideoRef?.(el);
+  }, [onVideoRef]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const animationFrameRef = useRef<number>();
   const lastProcessTime = useRef<number>(0);
@@ -176,8 +184,8 @@ export const VideoFeed = ({
           {videoSrc && (
             <div className="flex items-center gap-2 ml-4">
               {/* ROI Indicator */}
-              <Badge 
-                variant={showROI ? "default" : "outline"} 
+              <Badge
+                variant={showROI ? "default" : "outline"}
                 className="text-xs cursor-pointer"
                 onClick={() => setShowROI(!showROI)}
               >
@@ -185,8 +193,8 @@ export const VideoFeed = ({
                 ROI {showROI ? "ON" : "OFF"}
               </Badge>
               {/* Conditional Grad-CAM Status */}
-              <Badge 
-                variant={displayHeatmap ? "default" : "secondary"} 
+              <Badge
+                variant={displayHeatmap ? "default" : "secondary"}
                 className="text-xs"
               >
                 <Gauge className="w-3 h-3 mr-1" />
@@ -197,17 +205,17 @@ export const VideoFeed = ({
         </div>
         {videoSrc && (
           <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={togglePlayPause}
               className="h-8 px-3"
             >
               {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
             </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={resetVideo}
               className="h-8 px-3"
             >
@@ -216,7 +224,7 @@ export const VideoFeed = ({
           </div>
         )}
       </div>
-      
+
       <div ref={containerRef} className="relative aspect-video bg-background/50">
         {!videoSrc ? (
           <div
@@ -248,19 +256,19 @@ export const VideoFeed = ({
         ) : (
           <>
             <video
-              ref={videoRef}
+              ref={setVideoRef}
               src={videoSrc}
               className="w-full h-full object-cover"
               loop
               muted
               playsInline
             />
-            
+
             {/* OPTIMIZATION #3: ROI Visualization
                 Shows the region of interest (bottom 65% of frame)
                 The grayed-out top portion is excluded from inference */}
             {showROI && isPlaying && (
-              <div 
+              <div
                 className="absolute left-0 right-0 top-0 bg-black/40 pointer-events-none"
                 style={{ height: `${ROI_TOP_CROP * 100}%` }}
               >
@@ -313,7 +321,7 @@ export const VideoFeed = ({
             )}
           </>
         )}
-        
+
         {/* Grid overlay */}
         <div className="absolute inset-0 grid-pattern opacity-20 pointer-events-none" />
       </div>

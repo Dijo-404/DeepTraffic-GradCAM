@@ -9,7 +9,7 @@ export const ModelInfoCard = ({ className }: ModelInfoCardProps) => {
   const specs = [
     { icon: Brain, label: "Classifier", value: "MobileNetV2" },
     { icon: Target, label: "Detector", value: "YOLOv8" },
-    { icon: Clock, label: "Inference", value: "~23ms" },
+    { icon: Clock, label: "Tracker", value: "BoT-SORT" },
     { icon: Cpu, label: "Framework", value: "PyTorch" },
   ];
 
@@ -19,7 +19,7 @@ export const ModelInfoCard = ({ className }: ModelInfoCardProps) => {
         <Brain className="w-5 h-5 text-primary" />
         Model Information
       </h3>
-      
+
       <div className="grid grid-cols-2 gap-3">
         {specs.map(({ icon: Icon, label, value }) => (
           <div key={label} className="bg-secondary/50 rounded-lg p-3">
@@ -37,7 +37,7 @@ export const ModelInfoCard = ({ className }: ModelInfoCardProps) => {
         <ul className="space-y-2 text-sm text-muted-foreground">
           <li className="flex items-start gap-2">
             <span className="text-blue-400 mt-1">•</span>
-            <span><strong className="text-blue-400">YOLOv8:</strong> Real-time vehicle detection & counting</span>
+            <span><strong className="text-blue-400">YOLOv8 + BoT-SORT:</strong> Real-time vehicle detection & multi-object tracking</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary mt-1">•</span>

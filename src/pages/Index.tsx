@@ -106,9 +106,10 @@ const Index = () => {
         <div className="grid grid-cols-12 gap-6">
           {/* Left Column - Video Feed */}
           <div className="col-span-12 lg:col-span-8 space-y-6">
-            <VideoFeed 
+            <VideoFeed
               onVideoLoad={handleVideoLoad}
               onFrameProcess={handleFrameProcess}
+              onVideoRef={yolo.setVideoElement}
               showHeatmap={heatmapEnabled}
               trafficStatus={hybridResult.status}
               detections={yolo.detections}
@@ -118,7 +119,7 @@ const Index = () => {
             {/* Status Bar */}
             <div className="glass-card p-4 flex items-center justify-between">
               <StatusIndicator status={hybridResult.status} />
-              
+
               <div className="flex items-center gap-6">
                 <div className="text-center">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Vehicles</p>
@@ -182,6 +183,7 @@ const Index = () => {
               fps={yolo.fps}
               lastInferenceTime={yolo.lastInferenceTime}
               isDetecting={yolo.isDetecting}
+              activeTrackIds={yolo.activeTrackIds}
               showBoundingBoxes={showBoundingBoxes}
               onToggleBoundingBoxes={setShowBoundingBoxes}
               confidenceThreshold={yoloConfidence}
@@ -196,7 +198,7 @@ const Index = () => {
               onOpacityChange={setHeatmapOpacity}
               trafficStatus={hybridResult.status}
             />
-            
+
             <InferenceStats
               frameCount={inference.frameCount}
               processedFrames={inference.processedFrames}
@@ -204,9 +206,9 @@ const Index = () => {
               isProcessing={inference.isProcessing}
               settings={inference.settings}
             />
-            
+
             <ModelInfoCard />
-            
+
             <ActivityLog />
           </div>
         </div>
@@ -214,10 +216,10 @@ const Index = () => {
         {/* Footer */}
         <footer className="text-center py-4 border-t border-border/50">
           <p className="text-sm text-muted-foreground">
-            TrafficSense AI • Powered by <span className="text-blue-400">YOLOv8</span> + <span className="text-primary">MobileNetV2</span> + <span className="text-primary">Grad-CAM</span>
+            TrafficSense AI • Powered by <span className="text-blue-400">YOLOv8 + BoT-SORT</span> + <span className="text-primary">MobileNetV2</span> + <span className="text-primary">Grad-CAM</span>
           </p>
           <p className="text-xs text-muted-foreground/60 mt-1">
-            Hybrid: YOLO Detection • CNN Classification • Temporal Smoothing • Confidence Filtering • ROI Cropping • Conditional Grad-CAM
+            Hybrid: YOLO Detection • BoT-SORT Tracking • CNN Classification • Temporal Smoothing • Conditional Grad-CAM
           </p>
         </footer>
       </div>

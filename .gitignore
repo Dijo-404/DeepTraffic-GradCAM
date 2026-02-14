@@ -22,3 +22,20 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python / Backend
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Model weights (large binary files)
+*.pt
+*.pth
+*.onnx
+backend/models/
+
+# Ultralytics runs
+runs/

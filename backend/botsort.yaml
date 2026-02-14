@@ -1,0 +1,17 @@
+# BoT-SORT tracker configuration for traffic surveillance
+# Tuned for multi-vehicle tracking in traffic scenarios
+
+tracker_type: botsort
+
+# Tracking parameters
+track_high_thresh: 0.3      # High detection threshold for new tracks
+track_low_thresh: 0.05      # Low threshold for second association
+new_track_thresh: 0.4       # Threshold to initialize a new track
+track_buffer: 45            # Frames to keep lost tracks (higher = longer memory)
+match_thresh: 0.8           # Matching threshold for association
+
+# BoT-SORT specific
+gmc_method: sparseOptFlow   # Global motion compensation method
+proximity_thresh: 0.5       # Spatial proximity threshold
+appearance_thresh: 0.25     # Appearance re-identification threshold
+with_reid: false            # Disable ReID for speed (enable if GPU allows)

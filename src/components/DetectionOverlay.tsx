@@ -12,31 +12,37 @@ interface DetectionOverlayProps {
 }
 
 const classColors: Record<VehicleClass, { border: string; bg: string; text: string }> = {
-  car: { 
-    border: "border-blue-400", 
-    bg: "bg-blue-500/80", 
-    text: "text-white" 
+  car: {
+    border: "border-blue-400",
+    bg: "bg-blue-500/80",
+    text: "text-white"
   },
-  truck: { 
-    border: "border-orange-400", 
-    bg: "bg-orange-500/80", 
-    text: "text-white" 
+  truck: {
+    border: "border-orange-400",
+    bg: "bg-orange-500/80",
+    text: "text-white"
   },
-  bus: { 
-    border: "border-yellow-400", 
-    bg: "bg-yellow-500/80", 
-    text: "text-black" 
+  bus: {
+    border: "border-yellow-400",
+    bg: "bg-yellow-500/80",
+    text: "text-black"
   },
-  motorcycle: { 
-    border: "border-purple-400", 
-    bg: "bg-purple-500/80", 
-    text: "text-white" 
+  motorcycle: {
+    border: "border-purple-400",
+    bg: "bg-purple-500/80",
+    text: "text-white"
   },
-  bicycle: { 
-    border: "border-green-400", 
-    bg: "bg-green-500/80", 
-    text: "text-white" 
+  bicycle: {
+    border: "border-green-400",
+    bg: "bg-green-500/80",
+    text: "text-white"
   },
+};
+
+/** Generate a consistent hue for a given track ID */
+const getTrackColor = (trackId: number): string => {
+  const hue = (trackId * 47) % 360;
+  return `hsl(${hue}, 70%, 55%)`;
 };
 
 /**
@@ -66,9 +72,10 @@ const DetectionOverlay = memo(({
   return (
     <div className={cn("absolute inset-0 pointer-events-none", className)}>
       {detections.map((detection) => {
-        const { bbox, class: cls, confidence, id } = detection;
-        const colors = classColors[cls];
-        
+        const { bbox, class: cls, confidence, id, trackId } = detection;
+        const colors = classColors[cls] ?? classColors.car;
+        const trackColor = trackId > 0 ? getTrackColor(trackId) : undefined;
+
         // Convert normalized coordinates to pixels
         const left = bbox.x * containerWidth;
         const top = bbox.y * containerHeight;
@@ -80,7 +87,7 @@ const DetectionOverlay = memo(({
             key={id}
             className={cn(
               "absolute border-2 rounded-sm",
-              colors.border,
+              trackColor ? "" : colors.border,
               "transition-all duration-75"
             )}
             style={{
@@ -88,17 +95,21 @@ const DetectionOverlay = memo(({
               top: `${top}px`,
               width: `${width}px`,
               height: `${height}px`,
+              ...(trackColor ? { borderColor: trackColor } : {}),
             }}
           >
             {/* Label */}
             {showLabels && (
-              <div 
+              <div
                 className={cn(
                   "absolute -top-5 left-0 px-1.5 py-0.5 rounded-sm text-[10px] font-medium uppercase tracking-wide whitespace-nowrap",
-                  colors.bg,
-                  colors.text
+                  trackColor ? "text-white" : cn(colors.bg, colors.text)
                 )}
+                style={trackColor ? { backgroundColor: trackColor } : {}}
               >
+                {trackId > 0 && (
+                  <span className="mr-1 opacity-90 font-bold">#{trackId}</span>
+                )}
                 {cls}
                 {showConfidence && (
                   <span className="ml-1 opacity-80">
