@@ -8,7 +8,7 @@ This project uses a hybrid approach to analyze traffic density:
 
 ```mermaid
 graph TD
-    User[User] -->|Upload Video| Frontend[Frontend (React/Vite)]
+    User[User] -->|Upload Video| Frontend["Frontend (React/Vite)"]
     Frontend -->|Capture Frames| API[FastAPI Backend]
     
     subgraph Backend Analysis
@@ -18,7 +18,7 @@ graph TD
     end
     
     subgraph Frontend Processing
-        Frontend -->|Raw Frame| Classifier[MobileNetV2 (TF.js)]
+        Frontend -->|Raw Frame| Classifier["MobileNetV2 (TF.js)"]
         Classifier -->|Density Class| HybridLogic[Hybrid Engine]
         API -->|Tracked Objects| HybridLogic
         HybridLogic -->|Combined Result| Dashboard[UI Dashboard]
