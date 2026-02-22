@@ -10,10 +10,13 @@ interface VideoFeedProps {
   onVideoLoad?: (video: HTMLVideoElement) => void;
   onFrameProcess?: () => void;
   onVideoRef?: (el: HTMLVideoElement | null) => void;
-  showHeatmap: boolean;
   trafficStatus: "low" | "high" | "analyzing";
   /** YOLO detection results to display as bounding boxes */
   detections?: Detection[];
+  /** Real Grad-CAM heatmap base64 string */
+  gradCamImage?: string | null;
+  /** Opacity of the heatmap overlay (0-100) */
+  heatmapOpacity?: number;
   /** Whether to show bounding boxes overlay */
   showBoundingBoxes?: boolean;
   className?: string;
@@ -32,29 +35,16 @@ interface VideoFeedProps {
  */
 const ROI_TOP_CROP = 0.35; // Crop top 35%, keep bottom 65%
 
-/**
- * OPTIMIZATION #4: Conditional Grad-CAM Execution
- * 
- * Generate Grad-CAM heatmaps ONLY when traffic is classified as HIGH density.
- * Skip Grad-CAM computation during LOW traffic states to reduce computational
- * overhead and improve real-time performance. This is justified because:
- * - Users primarily need explainability during congestion events
- * - Low traffic states don't require visual explanation
- * - Saves ~40-60% GPU computation during normal traffic
- */
-const shouldShowGradCAM = (status: "low" | "high" | "analyzing", enabled: boolean): boolean => {
-  return enabled && status === "high";
-};
-
 export const VideoFeed = ({
   onVideoLoad,
   onFrameProcess,
   onVideoRef,
-  showHeatmap,
   trafficStatus,
-  detections = [],
+  detections,
+  gradCamImage,
+  heatmapOpacity = 60,
   showBoundingBoxes = false,
-  className
+  className,
 }: VideoFeedProps) => {
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -172,8 +162,7 @@ export const VideoFeed = ({
     setIsPlaying(false);
   };
 
-  // Conditional Grad-CAM: Only show when HIGH traffic (Optimization #4)
-  const displayHeatmap = shouldShowGradCAM(trafficStatus, showHeatmap);
+
 
   return (
     <div className={cn("glass-card overflow-hidden", className)}>
@@ -194,11 +183,11 @@ export const VideoFeed = ({
               </Badge>
               {/* Conditional Grad-CAM Status */}
               <Badge
-                variant={displayHeatmap ? "default" : "secondary"}
+                variant={gradCamImage ? "default" : "secondary"}
                 className="text-xs"
               >
                 <Gauge className="w-3 h-3 mr-1" />
-                Grad-CAM: {displayHeatmap ? "ACTIVE" : "IDLE"}
+                Grad-CAM: {gradCamImage ? "ACTIVE" : "IDLE"}
               </Badge>
             </div>
           )}
@@ -280,16 +269,23 @@ export const VideoFeed = ({
               </div>
             )}
 
-            {/* OPTIMIZATION #4: Conditional Grad-CAM Heatmap
-                Heatmap only renders when traffic is HIGH
-                This saves computation during low traffic periods */}
-            {displayHeatmap && isPlaying && (
-              <div className="absolute inset-0 pointer-events-none" style={{ top: `${ROI_TOP_CROP * 100}%` }}>
-                <div className="heatmap-overlay absolute inset-0 opacity-60" />
-                {/* Simulated congestion hotspots */}
-                <div className="absolute bottom-1/4 left-1/3 w-24 h-24 rounded-full bg-traffic-high/40 blur-xl animate-pulse" />
-                <div className="absolute bottom-1/3 right-1/4 w-32 h-32 rounded-full bg-traffic-high/30 blur-2xl animate-pulse-slow" />
-                <div className="absolute top-1/3 left-1/2 w-20 h-20 rounded-full bg-warning/40 blur-xl animate-pulse" />
+            {/* Real Grad-CAM HetaMap Overlay */}
+            {gradCamImage && (
+              <div className="absolute inset-0 z-10 pointer-events-none animate-in fade-in duration-500">
+                <img
+                  src={`data:image/jpeg;base64,${gradCamImage}`}
+                  alt="Grad-CAM Heatmap"
+                  className="w-full h-full object-cover"
+                  style={{ opacity: heatmapOpacity / 100 }}
+                />
+
+                {/* Legend/Info Badge */}
+                <div className="absolute top-4 right-4 bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/20">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-xs text-white font-medium">MobileNetV3 Attention</span>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -304,14 +300,7 @@ export const VideoFeed = ({
               />
             )}
 
-            {/* Processing indicator during LOW traffic (no Grad-CAM) */}
-            {showHeatmap && !displayHeatmap && isPlaying && trafficStatus !== "analyzing" && (
-              <div className="absolute bottom-4 right-4 bg-secondary/90 backdrop-blur-sm px-3 py-1.5 rounded-lg">
-                <span className="text-xs text-muted-foreground">
-                  Grad-CAM: Skipped (Low Traffic)
-                </span>
-              </div>
-            )}
+
 
             {/* Scan line effect */}
             {isPlaying && (

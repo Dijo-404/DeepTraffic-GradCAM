@@ -15,3 +15,4 @@ gmc_method: sparseOptFlow   # Global motion compensation method
 proximity_thresh: 0.5       # Spatial proximity threshold
 appearance_thresh: 0.25     # Appearance re-identification threshold
 with_reid: false            # Disable ReID for speed (enable if GPU allows)
+fuse_score: true            # Fuse detection score with tracking

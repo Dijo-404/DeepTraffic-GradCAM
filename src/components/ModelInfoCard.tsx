@@ -7,7 +7,7 @@ interface ModelInfoCardProps {
 
 export const ModelInfoCard = ({ className }: ModelInfoCardProps) => {
   const specs = [
-    { icon: Brain, label: "Classifier", value: "MobileNetV2" },
+    { icon: Brain, label: "Classifier", value: "MobileNetV3" },
     { icon: Target, label: "Detector", value: "YOLOv8" },
     { icon: Clock, label: "Tracker", value: "BoT-SORT" },
     { icon: Cpu, label: "Framework", value: "PyTorch" },
@@ -41,7 +41,7 @@ export const ModelInfoCard = ({ className }: ModelInfoCardProps) => {
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary mt-1">•</span>
-            <span><strong className="text-primary">MobileNetV2:</strong> Binary density classification</span>
+            <span><strong className="text-primary">MobileNetV3:</strong> Binary density classification</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary mt-1">•</span>

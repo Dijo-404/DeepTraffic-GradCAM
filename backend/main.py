@@ -21,6 +21,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from ultralytics import YOLO
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+from pytorch_grad_cam.utils.image import show_cam_on_image
+from torchvision.models import mobilenet_v3_small, MobileNet_V3_Small_Weights
+import torch
 
 # ─── Configuration ──────────────────────────────────────────────────
 MODEL_PATH = Path(__file__).parent / "models" / "best.pt"
@@ -31,6 +36,8 @@ DEFAULT_IMGSZ = 640
 
 # ─── Global model reference ────────────────────────────────────────
 model: YOLO | None = None
+explain_model = None
+cam_extractor = None
 
 
 @asynccontextmanager
@@ -46,6 +53,14 @@ async def lifespan(app: FastAPI):
     print(f"✓ Model loaded: {MODEL_PATH.name}")
     print(f"✓ Classes: {model.names}")
     print(f"✓ Tracker: BoT-SORT ({TRACKER_CONFIG.name})")
+
+    # Load MobileNetV3 for Grad-CAM
+    global explain_model, cam_extractor
+    explain_model = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.DEFAULT)
+    explain_model.eval()
+    target_layers = [explain_model.features[-1]]
+    cam_extractor = GradCAM(model=explain_model, target_layers=target_layers)
+    print("✓ Explainability: MobileNetV3 + GradCAM ready")
     yield
     model = None
 
@@ -97,7 +112,23 @@ class DetectResponse(BaseModel):
     inference_time_ms: float
     frame_width: int
     frame_height: int
+class DetectResponse(BaseModel):
+    detections: list[DetectionResult]
+    vehicle_count: int
+    count_by_class: dict[str, int]
+    inference_time_ms: float
+    frame_width: int
+    frame_height: int
     tracker: str = "botsort"
+
+
+class ExplainRequest(BaseModel):
+    frame: str # base64
+
+
+class ExplainResponse(BaseModel):
+    heatmap: str # base64
+    inference_time_ms: float
 
 
 # ─── Endpoints ──────────────────────────────────────────────────────
@@ -203,7 +234,75 @@ async def detect(req: DetectRequest):
         frame_width=w,
         frame_height=h,
     )
+    return DetectResponse(
+        detections=detections,
+        vehicle_count=len(detections),
+        count_by_class=count_by_class,
+        inference_time_ms=round(inference_ms, 2),
+        frame_width=w,
+        frame_height=h,
+    )
 
+
+@app.post("/api/explain", response_model=ExplainResponse)
+async def explain(req: ExplainRequest):
+    """Generate Grad-CAM heatmap for the given frame."""
+    if cam_extractor is None:
+        raise HTTPException(503, "Explainability model not loaded")
+
+    t0 = time.perf_counter()
+    
+    # Decode frame
+    try:
+        img_bytes = base64.b64decode(req.frame)
+        np_arr = np.frombuffer(img_bytes, dtype=np.uint8)
+        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        if frame is None:
+            raise ValueError("Failed to decode")
+    except Exception as e:
+        raise HTTPException(400, f"Invalid frame: {e}")
+
+    # Preprocess for MobileNet (resize to 224x224, normalize)
+    # MobileNet expects RGB 0-1 float
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    rgb_frame_float = np.float32(rgb_frame) / 255
+    input_tensor = cv2.resize(rgb_frame_float, (224, 224))
+    input_tensor = torch.from_numpy(input_tensor).permute(2, 0, 1).unsqueeze(0)
+
+    # Generate CAM
+    # Target: 670 (Motor scooter), 817 (Sports car), 751 (Racer), 436 (Beach wagon)
+    # We'll use a loose target or sum of vehicle targets if generic, 
+    # but for simplicity, let's target the predicted class or a generic "vehicle" proxy.
+    # Since we don't classify first here, we target "Street sign" (919) or "Traffic light" (920)? 
+    # Or better: "Trailer truck" (867), "Moving van" (675).
+    # Let's target "Sports car" (817) as a proxy for "cars".
+    # Or better, we can let GradCAM pick the top category.
+    targets = None # Targets the highest confidence category
+
+    # Generate grayscale CAM
+    grayscale_cam = cam_extractor(input_tensor=input_tensor, targets=targets)
+    grayscale_cam = grayscale_cam[0, :]
+    
+    # Resize mask back to original frame size
+    h, w = frame.shape[:2]
+    grayscale_cam_resized = cv2.resize(grayscale_cam, (w, h))
+
+    # Create visualization
+    visualization = show_cam_on_image(rgb_frame_float, grayscale_cam_resized, use_rgb=True)
+    
+    # Convert to BGR for encoding
+    vis_bgr = cv2.cvtColor(visualization, cv2.COLOR_RGB2BGR)
+
+    # Encode
+    _, buffer = cv2.imencode(".jpg", vis_bgr)
+    b64_str = base64.b64encode(buffer).decode("utf-8")
+    
+    inference_ms = (time.perf_counter() - t0) * 1000
+
+    return ExplainResponse(
+        heatmap=b64_str,
+        inference_time_ms=round(inference_ms, 2)
+    )
 
 if __name__ == "__main__":
     import uvicorn

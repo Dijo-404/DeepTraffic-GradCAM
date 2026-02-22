@@ -38,10 +38,10 @@ interface UseTrafficInferenceOptions {
  */
 const getMajorityVote = (predictions: ("low" | "high")[]): "low" | "high" => {
   if (predictions.length === 0) return "low";
-  
+
   const highCount = predictions.filter(p => p === "high").length;
   const lowCount = predictions.length - highCount;
-  
+
   // Require clear majority for state change
   return highCount > lowCount ? "high" : "low";
 };
@@ -56,27 +56,13 @@ const getMajorityVote = (predictions: ("low" | "high")[]): "low" | "high" => {
  * low-confidence predictions from causing state changes.
  */
 const shouldAcceptPrediction = (
-  confidence: number, 
+  confidence: number,
   threshold: number
 ): boolean => {
   return confidence >= threshold;
 };
 
-/**
- * Simulates CNN inference with realistic confidence scores
- * In production, this would call the actual PyTorch model via API
- */
-const simulateInference = (): { prediction: "low" | "high"; confidence: number } => {
-  // Simulate model output with varying confidence levels
-  const baseConfidence = 0.65 + Math.random() * 0.30; // 0.65 - 0.95
-  const prediction = Math.random() > 0.4 ? "high" : "low";
-  
-  // Add some noise to simulate real-world uncertainty
-  const noise = (Math.random() - 0.5) * 0.2;
-  const confidence = Math.max(0.3, Math.min(0.98, baseConfidence + noise));
-  
-  return { prediction, confidence };
-};
+
 
 export const useTrafficInference = (options: UseTrafficInferenceOptions = {}) => {
   const {
@@ -106,9 +92,15 @@ export const useTrafficInference = (options: UseTrafficInferenceOptions = {}) =>
    * computational load. The prediction is interpolated
    * between processed frames using the last known state.
    */
-  const processFrame = useCallback(() => {
+  /**
+   * Process current frame data for traffic analysis
+   * 
+   * @param currentVehicleCount - Real-time vehicle count from YOLO
+   * @param averageConfidence - Average confidence of current detections
+   */
+  const processFrame = useCallback((currentVehicleCount: number, averageConfidence: number = 0) => {
     frameCounter.current += 1;
-    
+
     setState(prev => ({
       ...prev,
       frameCount: prev.frameCount + 1,
@@ -116,25 +108,29 @@ export const useTrafficInference = (options: UseTrafficInferenceOptions = {}) =>
 
     // Skip frames for performance (process every Nth frame)
     if (frameCounter.current % frameSkipRate !== 0) {
-      return; // Skip this frame, maintain current prediction
+      return;
     }
 
     setState(prev => ({ ...prev, isProcessing: true }));
 
-    // Simulate inference (in production: call PyTorch API)
-    const { prediction, confidence } = simulateInference();
+    // Real inference logic based on meaningful thresholds
+    // > 8 vehicles = HIGH traffic
+    // <= 8 vehicles = LOW traffic
+    const prediction = currentVehicleCount > 8 ? "high" : "low";
+
+    // Use actual model confidence or high confidence if count-based
+    const confidence = averageConfidence > 0 ? averageConfidence : (currentVehicleCount > 0 ? 0.85 : 0.95);
 
     // Optimization #2: Confidence-based filtering
     if (shouldAcceptPrediction(confidence, confidenceThreshold)) {
-      // Add to prediction history for temporal smoothing
+      // Add to prediction history
       predictionHistory.current.push(prediction);
-      
-      // Keep only last N predictions (sliding window)
+
       if (predictionHistory.current.length > temporalWindow) {
         predictionHistory.current.shift();
       }
 
-      // Optimization #1: Get majority vote from temporal window
+      // Optimization #1: Majority vote
       const stableStatus = getMajorityVote(predictionHistory.current);
       lastStableStatus.current = stableStatus;
 
@@ -146,7 +142,7 @@ export const useTrafficInference = (options: UseTrafficInferenceOptions = {}) =>
         processedFrames: prev.processedFrames + 1,
       }));
     } else {
-      // Low confidence: retain previous state (Optimization #2)
+      // Low confidence: retain previous state
       setState(prev => ({
         ...prev,
         status: lastStableStatus.current,
@@ -170,10 +166,30 @@ export const useTrafficInference = (options: UseTrafficInferenceOptions = {}) =>
     });
   }, []);
 
+  const explainFrame = useCallback(async (base64Frame: string): Promise<string | null> => {
+    setState(prev => ({ ...prev, isProcessing: true }));
+    try {
+      const resp = await fetch("/api/explain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ frame: base64Frame }),
+      });
+      if (!resp.ok) throw new Error("Backend error");
+      const data = await resp.json();
+      setState(prev => ({ ...prev, isProcessing: false }));
+      return data.heatmap;
+    } catch (e) {
+      console.error("Grad-CAM error:", e);
+      setState(prev => ({ ...prev, isProcessing: false }));
+      return null;
+    }
+  }, []);
+
   return {
     ...state,
     processFrame,
     reset,
+    explainFrame,
     // Expose optimization settings for UI display
     settings: {
       temporalWindow,

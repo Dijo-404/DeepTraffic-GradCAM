@@ -28,12 +28,17 @@ import { useYOLODetection } from "@/hooks/useYOLODetection";
 const Index = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [heatmapEnabled, setHeatmapEnabled] = useState(true);
-  const [heatmapOpacity, setHeatmapOpacity] = useState(60);
+  const [heatmapOpacity, setHeatmapOpacity] = useState(100);
   const [showBoundingBoxes, setShowBoundingBoxes] = useState(true);
   const [yoloConfidence, setYoloConfidence] = useState(0.5);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [sessionStart, setSessionStart] = useState<Date | null>(null);
   const [detectionCount, setDetectionCount] = useState(0);
+
+  // Grad-CAM State
+  const [gradCamImage, setGradCamImage] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
 
   // Initialize traffic inference with optimizations
   const inference = useTrafficInference({
@@ -74,9 +79,51 @@ const Index = () => {
     yolo.reset();
   };
 
+  const handleVideoRef = (el: HTMLVideoElement | null) => {
+    setVideoElement(el);
+    yolo.setVideoElement(el);
+  };
+
+  const handleAnalyzeFrame = async () => {
+    if (!videoElement) return;
+
+    // Pause video for analysis
+    videoElement.pause();
+    setIsAnalyzing(true);
+
+    // Capture frame
+    const canvas = document.createElement("canvas");
+    canvas.width = videoElement.videoWidth;
+    canvas.height = videoElement.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.drawImage(videoElement, 0, 0);
+      const base64 = canvas.toDataURL("image/jpeg", 0.8).split(",")[1];
+
+      // Fetch explanation
+      const heatmap = await inference.explainFrame(base64);
+      if (heatmap) {
+        setGradCamImage(heatmap);
+      }
+    }
+    setIsAnalyzing(false);
+  };
+
+  const handleResumeVideo = () => {
+    if (videoElement) {
+      videoElement.play();
+    }
+    setGradCamImage(null);
+  };
+
   const handleFrameProcess = () => {
-    inference.processFrame();
-    yolo.detectFrame(); // Run YOLO detection alongside classification
+    // Calculate average confidence from current YOLO detections
+    const avgConf = yolo.detections.length > 0
+      ? yolo.detections.reduce((sum, d) => sum + d.confidence, 0) / yolo.detections.length
+      : 0;
+
+    inference.processFrame(yolo.vehicleCount, avgConf);
+    yolo.detectFrame();
   };
 
 
@@ -109,14 +156,13 @@ const Index = () => {
             <VideoFeed
               onVideoLoad={handleVideoLoad}
               onFrameProcess={handleFrameProcess}
-              onVideoRef={yolo.setVideoElement}
-              showHeatmap={heatmapEnabled}
+              onVideoRef={handleVideoRef}
               trafficStatus={hybridResult.status}
               detections={yolo.detections}
               showBoundingBoxes={showBoundingBoxes}
-            />
-
-            {/* Status Bar */}
+              gradCamImage={gradCamImage}
+              heatmapOpacity={heatmapOpacity}
+            />{/* Status Bar */}
             <div className="glass-card p-4 flex items-center justify-between">
               <StatusIndicator status={hybridResult.status} />
 
@@ -171,6 +217,20 @@ const Index = () => {
                 icon={Car}
               />
             </div>
+
+            {/* Moved from Right Column to improve layout density */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <InferenceStats
+                frameCount={inference.frameCount}
+                processedFrames={inference.processedFrames}
+                confidence={inference.confidence}
+                isProcessing={inference.isProcessing}
+                settings={inference.settings}
+              />
+              <ModelInfoCard />
+            </div>
+
+            <ActivityLog />
           </div>
 
           {/* Right Column - Controls & Info */}
@@ -192,24 +252,14 @@ const Index = () => {
             />
 
             <GradCAMPanel
-              enabled={heatmapEnabled}
-              onToggle={setHeatmapEnabled}
               opacity={heatmapOpacity}
               onOpacityChange={setHeatmapOpacity}
               trafficStatus={hybridResult.status}
+              isAnalyzing={isAnalyzing}
+              isActive={!!gradCamImage}
+              onAnalyze={handleAnalyzeFrame}
+              onResume={handleResumeVideo}
             />
-
-            <InferenceStats
-              frameCount={inference.frameCount}
-              processedFrames={inference.processedFrames}
-              confidence={inference.confidence}
-              isProcessing={inference.isProcessing}
-              settings={inference.settings}
-            />
-
-            <ModelInfoCard />
-
-            <ActivityLog />
           </div>
         </div>
 
