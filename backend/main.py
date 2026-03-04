@@ -112,13 +112,6 @@ class DetectResponse(BaseModel):
     inference_time_ms: float
     frame_width: int
     frame_height: int
-class DetectResponse(BaseModel):
-    detections: list[DetectionResult]
-    vehicle_count: int
-    count_by_class: dict[str, int]
-    inference_time_ms: float
-    frame_width: int
-    frame_height: int
     tracker: str = "botsort"
 
 
@@ -234,14 +227,7 @@ async def detect(req: DetectRequest):
         frame_width=w,
         frame_height=h,
     )
-    return DetectResponse(
-        detections=detections,
-        vehicle_count=len(detections),
-        count_by_class=count_by_class,
-        inference_time_ms=round(inference_ms, 2),
-        frame_width=w,
-        frame_height=h,
-    )
+
 
 
 @app.post("/api/explain", response_model=ExplainResponse)

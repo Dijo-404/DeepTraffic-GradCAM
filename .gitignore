@@ -39,3 +39,10 @@ backend/models/
 
 # Ultralytics runs
 runs/
+
+# Test output files
+tests/output*
+tests/runs/
+
+# Bun lockfile (project uses npm)
+bun.lockb

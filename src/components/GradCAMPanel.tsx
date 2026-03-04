@@ -1,13 +1,15 @@
-import { Eye, Layers, Zap, AlertCircle } from "lucide-react";
+import { Eye, Layers, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface GradCAMPanelProps {
   opacity: number;
   onOpacityChange: (opacity: number) => void;
   trafficStatus?: "low" | "high" | "analyzing";
+  isAnalyzing?: boolean;
+  isActive?: boolean;
+  onAnalyze?: () => void;
+  onResume?: () => void;
   className?: string;
 }
 
@@ -34,12 +36,7 @@ export const GradCAMPanel = ({
   isActive = false,
   onAnalyze,
   onResume
-}: GradCAMPanelProps & {
-  isAnalyzing?: boolean;
-  isActive?: boolean;
-  onAnalyze?: () => void;
-  onResume?: () => void;
-}) => {
+}: GradCAMPanelProps) => {
   return (
     <div className={cn("glass-card p-5", className)}>
       <div className="flex items-center gap-3 mb-6">

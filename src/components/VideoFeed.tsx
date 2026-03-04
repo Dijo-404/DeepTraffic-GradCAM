@@ -40,7 +40,7 @@ export const VideoFeed = ({
   onFrameProcess,
   onVideoRef,
   trafficStatus,
-  detections,
+  detections = [],
   gradCamImage,
   heatmapOpacity = 60,
   showBoundingBoxes = false,
