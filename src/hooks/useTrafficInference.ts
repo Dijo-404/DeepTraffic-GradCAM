@@ -168,22 +168,32 @@ export const useTrafficInference = (options: UseTrafficInferenceOptions = {}) =>
 
   const explainFrame = useCallback(async (base64Frame: string): Promise<string | null> => {
     setState(prev => ({ ...prev, isProcessing: true }));
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45_000); // 45 s timeout
     try {
       const resp = await fetch("/api/explain", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ frame: base64Frame }),
+        signal: controller.signal,
       });
-      if (!resp.ok) throw new Error("Backend error");
+      clearTimeout(timeoutId);
+      if (!resp.ok) throw new Error(`Backend error ${resp.status}`);
       const data = await resp.json();
       setState(prev => ({ ...prev, isProcessing: false }));
       return data.heatmap;
     } catch (e) {
-      console.error("Grad-CAM error:", e);
+      clearTimeout(timeoutId);
+      if ((e as Error).name === "AbortError") {
+        console.error("Grad-CAM timed out after 45s");
+      } else {
+        console.error("Grad-CAM error:", e);
+      }
       setState(prev => ({ ...prev, isProcessing: false }));
       return null;
     }
   }, []);
+
 
   return {
     ...state,

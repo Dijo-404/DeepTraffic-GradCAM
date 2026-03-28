@@ -257,9 +257,11 @@ const Index = () => {
               trafficStatus={hybridResult.status}
               isAnalyzing={isAnalyzing}
               isActive={!!gradCamImage}
+              isVideoPlaying={isConnected}
               onAnalyze={handleAnalyzeFrame}
               onResume={handleResumeVideo}
             />
+
           </div>
         </div>
 

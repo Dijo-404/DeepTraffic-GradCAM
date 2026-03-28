@@ -1,6 +1,7 @@
 import { Eye, Layers, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
+import { useEffect, useState } from "react";
 
 interface GradCAMPanelProps {
   opacity: number;
@@ -8,6 +9,7 @@ interface GradCAMPanelProps {
   trafficStatus?: "low" | "high" | "analyzing";
   isAnalyzing?: boolean;
   isActive?: boolean;
+  isVideoPlaying?: boolean;
   onAnalyze?: () => void;
   onResume?: () => void;
   className?: string;
@@ -34,9 +36,18 @@ export const GradCAMPanel = ({
   className,
   isAnalyzing = false,
   isActive = false,
+  isVideoPlaying = false,
   onAnalyze,
   onResume
 }: GradCAMPanelProps) => {
+  const [elapsed, setElapsed] = useState(0);
+
+  // Tick elapsed seconds while GradCAM inference is running
+  useEffect(() => {
+    if (!isAnalyzing) { setElapsed(0); return; }
+    const id = setInterval(() => setElapsed(s => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [isAnalyzing]);
   return (
     <div className={cn("glass-card p-5", className)}>
       <div className="flex items-center gap-3 mb-6">
@@ -62,22 +73,23 @@ export const GradCAMPanel = ({
           {!isActive ? (
             <button
               onClick={onAnalyze}
-              disabled={isAnalyzing}
+              disabled={isAnalyzing || !isVideoPlaying}
+              title={!isVideoPlaying ? "Load and play a video first" : undefined}
               className={cn(
                 "w-full py-2 px-4 rounded-lg flex items-center justify-center gap-2 font-medium transition-all",
                 "bg-primary text-primary-foreground hover:bg-primary/90",
-                isAnalyzing && "opacity-70 cursor-wait"
+                (isAnalyzing || !isVideoPlaying) && "opacity-50 cursor-not-allowed"
               )}
             >
               {isAnalyzing ? (
                 <>
                   <Layers className="w-4 h-4 animate-spin" />
-                  Generating Heatmap...
+                  {elapsed > 0 ? `Generating Heatmap... ${elapsed}s` : "Generating Heatmap..."}
                 </>
               ) : (
                 <>
                   <Layers className="w-4 h-4" />
-                  Analyze Current Frame
+                  {isVideoPlaying ? "Analyze Current Frame" : "Load video to analyze"}
                 </>
               )}
             </button>

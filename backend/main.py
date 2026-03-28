@@ -230,15 +230,17 @@ async def detect(req: DetectRequest):
 
 
 
+
 @app.post("/api/explain", response_model=ExplainResponse)
 async def explain(req: ExplainRequest):
-    """Generate Grad-CAM heatmap for the given frame."""
+    """Generate Grad-CAM heatmap for the given frame (runs in thread pool)."""
     if cam_extractor is None:
         raise HTTPException(503, "Explainability model not loaded")
 
     t0 = time.perf_counter()
-    
-    # Decode frame
+    print("→ /api/explain: request received, decoding frame...")
+
+    # Decode frame (fast, can stay on event loop)
     try:
         img_bytes = base64.b64decode(req.frame)
         np_arr = np.frombuffer(img_bytes, dtype=np.uint8)
@@ -248,42 +250,43 @@ async def explain(req: ExplainRequest):
     except Exception as e:
         raise HTTPException(400, f"Invalid frame: {e}")
 
-    # Preprocess for MobileNet (resize to 224x224, normalize)
-    # MobileNet expects RGB 0-1 float
-    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    rgb_frame_float = np.float32(rgb_frame) / 255
-    input_tensor = cv2.resize(rgb_frame_float, (224, 224))
-    input_tensor = torch.from_numpy(input_tensor).permute(2, 0, 1).unsqueeze(0)
+    print(f"→ /api/explain: frame decoded ({frame.shape}), dispatching GradCAM to thread pool...")
 
-    # Generate CAM
-    # Target: 670 (Motor scooter), 817 (Sports car), 751 (Racer), 436 (Beach wagon)
-    # We'll use a loose target or sum of vehicle targets if generic, 
-    # but for simplicity, let's target the predicted class or a generic "vehicle" proxy.
-    # Since we don't classify first here, we target "Street sign" (919) or "Traffic light" (920)? 
-    # Or better: "Trailer truck" (867), "Moving van" (675).
-    # Let's target "Sports car" (817) as a proxy for "cars".
-    # Or better, we can let GradCAM pick the top category.
-    targets = None # Targets the highest confidence category
+    # Run the CPU-heavy PyTorch GradCAM inference in a thread pool
+    # so FastAPI's async event loop stays responsive for /api/detect
+    import asyncio
+    import functools
 
-    # Generate grayscale CAM
-    grayscale_cam = cam_extractor(input_tensor=input_tensor, targets=targets)
-    grayscale_cam = grayscale_cam[0, :]
-    
-    # Resize mask back to original frame size
-    h, w = frame.shape[:2]
-    grayscale_cam_resized = cv2.resize(grayscale_cam, (w, h))
+    def _run_gradcam(frame: np.ndarray) -> tuple[np.ndarray, float]:
+        """Heavy CPU work — executed in a background thread."""
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        rgb_frame_float = np.float32(rgb_frame) / 255
 
-    # Create visualization
-    visualization = show_cam_on_image(rgb_frame_float, grayscale_cam_resized, use_rgb=True)
-    
-    # Convert to BGR for encoding
-    vis_bgr = cv2.cvtColor(visualization, cv2.COLOR_RGB2BGR)
+        input_tensor = cv2.resize(rgb_frame_float, (224, 224))
+        input_tensor = torch.from_numpy(input_tensor).permute(2, 0, 1).unsqueeze(0)
 
-    # Encode
-    _, buffer = cv2.imencode(".jpg", vis_bgr)
+        # targets=None → GradCAM targets highest-confidence class automatically
+        grayscale_cam = cam_extractor(input_tensor=input_tensor, targets=None)
+        grayscale_cam = grayscale_cam[0, :]
+
+        # Resize heatmap back to original resolution
+        h, w = frame.shape[:2]
+        grayscale_cam_resized = cv2.resize(grayscale_cam, (w, h))
+
+        # Blend heatmap onto original frame
+        visualization = show_cam_on_image(rgb_frame_float, grayscale_cam_resized, use_rgb=True)
+        vis_bgr = cv2.cvtColor(visualization, cv2.COLOR_RGB2BGR)
+        return vis_bgr
+
+    loop = asyncio.get_event_loop()
+    vis_bgr = await loop.run_in_executor(None, functools.partial(_run_gradcam, frame))
+
+    # Encode result
+    _, buffer = cv2.imencode(".jpg", vis_bgr, [cv2.IMWRITE_JPEG_QUALITY, 85])
     b64_str = base64.b64encode(buffer).decode("utf-8")
-    
+
     inference_ms = (time.perf_counter() - t0) * 1000
+    print(f"✓ /api/explain: done in {inference_ms:.0f}ms")
 
     return ExplainResponse(
         heatmap=b64_str,

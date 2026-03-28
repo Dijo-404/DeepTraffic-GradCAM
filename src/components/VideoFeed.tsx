@@ -51,12 +51,12 @@ export const VideoFeed = ({
   const [isDragging, setIsDragging] = useState(false);
   const [showROI, setShowROI] = useState(true);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Expose video element to parent via callback ref
   const setVideoRef = useCallback((el: HTMLVideoElement | null) => {
-    (videoRef as React.MutableRefObject<HTMLVideoElement | null>).current = el;
+    videoRef.current = el;
     onVideoRef?.(el);
   }, [onVideoRef]);
   const fileInputRef = useRef<HTMLInputElement>(null);
